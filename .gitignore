@@ -1,0 +1,18 @@
+# Runtime ledger and Docker volume data - never commit business data
+docker/inventory-data/*.db
+docker/inventory-data/*.db-journal
+
+# Python caches and environments
+__pycache__/
+*.pyc
+.venv/
+
+# Secrets: ngrok config/tokens, env files, private keys
+.env
+ngrok.yml
+*.pem
+id_*
+!*.pub
+
+# macOS
+.DS_Store

@@ -1,0 +1,73 @@
+# Pho65 Café Week 4 mobile-inventory stack -- clean baseline.
+# Two coordinated containers:
+#   - app   : the Flask order-tracker (Week 3 P1.2)
+#   - sshd  : a minimal Linux + OpenSSH server the student reaches from the
+#             host to diagnose/restart "app" as if it were a remote server.
+#
+# This file is the correct, working configuration used for instructor
+# testing and development. It is copied into the student starter package
+# during packaging (P3), and ONLY that copy has
+# week3/instructor-only/seed/apply-seed.sh run against it -- which directly
+# edits that copy's sshd host port, replaces its authorized_keys, and
+# replaces its shared-config/overdue.env. This file itself must never be
+# seeded; it stays the clean reference build.
+
+services:
+  app:
+    build: ./app
+    container_name: pho65-app
+    environment:
+      OVERDUE_MIN: "20"
+      ORDERS_CSV: "/data/pho65-orders-valid.csv"
+      NOW_OVERRIDE: "2026-01-15 12:30"
+      OVERDUE_MIN_CONFIG_PATH: "/config/overdue.env"
+      STAFF_CONFIG_PATH: "/config/staff.txt"
+      # Local pilot PIN for the staff Edit tab. This is a fabricated class value
+      # and a guard against accidental edits during a shift -- NOT authentication
+      # and NOT a secret: anyone reading this file can see it. Real access control
+      # is listed as a known limitation in README.md.
+      STAFF_PIN: "2468"
+    volumes:
+      - ../sample-data:/data:ro
+      # Persistent local SQLite ledger. Reset it only with the documented fixture command.
+      - ./inventory-data:/inventory-data
+      # Shared, WRITABLE config: the app re-reads OVERDUE_MIN from this
+      # file on every request. This is what lets a student fix the seeded
+      # Stage 3 (app-logic) failure by editing one file over SSH -- no
+      # container restart or Docker-in-Docker access needed.
+      - ./shared-config:/config
+    ports:
+      # localhost:5000 is the upstream for `ngrok http 5000`. ngrok gives a
+      # phone an HTTPS URL; it does not belong in this compose file.
+      - "5000:5000"
+    restart: unless-stopped
+
+  sshd:
+    build: ./sshd
+    container_name: pho65-sshd
+    ports:
+      # Host port 2222 -> container port 22. THIS is the exact line the
+      # Stage 1 seed changes (see instructor-only/seed/apply-seed.sh):
+      # the seed edits "2222" to "9999" in the STUDENT PACKAGE'S copy of
+      # this file, so host port 2222 -- the port every instruction and
+      # known-answer test refers to -- is never published at all.
+      - "2222:22"
+    volumes:
+      - ./sshd/authorized_keys:/keys/authorized_keys:ro
+      # Same shared config directory as "app", mounted read-write, so the
+      # student can inspect and fix /config/overdue.env from inside their
+      # SSH session.
+      - ./shared-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+# Notes for instructors and students:
+# - `./sshd/authorized_keys` starts as an EMPTY file. Each student generates
+#   their own SSH keypair (Week 3 Step 4) and pastes their PUBLIC key into
+#   this file before first `docker compose up`. Never commit or distribute
+#   an actual private key.
+# - Clean-baseline connection test once the stack is up and a public key is
+#   installed:
+#     ssh -i <path-to-private-key> pho65user@localhost -p 2222 whoami
+#   Expected output: pho65user

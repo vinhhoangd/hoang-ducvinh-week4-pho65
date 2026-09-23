@@ -1,0 +1,58 @@
+# AI-Use Log — Week 4 Pho65 Mobile Inventory
+
+Agent: **Claude Code** (Claude desktop app). Every row records what the agent proposed, what the human decided, and how it was independently verified. "The agent said it passed" is never the evidence.
+
+**Working-mode note:** at the student's request the agent ran terminal commands in its own shell while the student reviewed each result. Course instructions ask students to run commands personally, so this deviation is recorded here, and the student re-runs the demonstration commands (build, SSH check, known-answer view) before the oral defense.
+
+**Credential boundary:** the agent installed the ngrok program only. It did not register an account, open the dashboard, see or receive an authtoken, or run `ngrok config add-authtoken`. No token appears in this log.
+
+---
+
+## Interaction log
+
+| Date / time | Agent / tool | Task or prompt | Proposed action / output | Accept, revise, or reject | Verification (by the student) | Student-owned decision | Remaining limitation |
+|---|---|---|---|---|---|---|---|
+| 09-22 14:20 | Claude Code | Find and read the Week 4 assignment | Could not read BrowserOS tabs (its MCP returns empty session handles); asked for the Canvas URL, then read the full assignment page | Accept | Student supplied the URL and confirmed the page content matches Canvas | Which browser/tab to use | Agent cannot enumerate BrowserOS tabs; URLs must be pasted |
+| 09-22 14:30 | Claude Code | Step 0 tool check | Reported Python 3.12.8, Git 2.50.1, Docker 29.7.2 + Compose v5.5.0, OpenSSH 10.3p1, curl 8.17.0 ready; **ngrok missing**; Docker engine not running | Accept | Student saw the version output; Docker Desktop started and `docker version` then showed Client + Server | Approving any installation | — |
+| 09-22 14:33 | Claude Code | Install the missing tool | `brew install ngrok` (ordinary non-secret command), then `ngrok version` → `3.39.11`; stopped before sign-in | Accept | `ngrok version` printed by the student's shell | Account creation and token configuration stay with the student | Tunnel untested until the student configures their own token |
+| 09-22 14:36 | Claude Code | Download starter package | Located `week4-student-starter.zip` in the course Drive folder and downloaded it through the browser (730,848 bytes) | Accept | Extracted tree matches the file list in START-HERE | Where the project lives on disk | First download attempt 403'd on a second Google account |
+| 09-22 14:40 | Claude Code | Step 1.1 inspect before running | Read `docker-compose.yml`, both Dockerfiles, `app.py`, `test_inventory.py`, sshd config, fixtures **without editing**. Flagged: `/` lost the Week 3 overdue logic; `authorized_keys` empty; no saved-image path; scanner accepts retail formats; waste/correction need no reason; negative guard covers only used/wasted; CDN dependency | Accept (findings) | Student opened `app.py` and `docker-compose.yml` and confirmed each flag | Which gaps are in scope for Week 4 | — |
+| 09-22 14:41 | Claude Code | Week 3 carry-over | Copy the Week 3 **public** key into `docker/sshd/authorized_keys`, restart only `sshd` | Accept | `ssh -i <key> pho65user@localhost -p 2222 whoami` → `pho65user`; fingerprint of `authorized_keys` matches the `.pub` | Which keys the server trusts | Teammates' keys still to be added |
+| 09-22 14:41 | Claude Code | SSH host-key warning after rebuild | Diagnosed `REMOTE HOST IDENTIFICATION HAS CHANGED` as the expected result of building a **new** sshd image; proposed `ssh-keygen -R "[localhost]:2222"` | Accept | Re-connect succeeded; new host key `SHA256:zVX3…` recorded in `regression-test.md` | Accepting a changed host key only because we caused it | Every teammate machine will see this once |
+| 09-22 14:42 | Claude Code | Step 2 plan (file-by-file) | Ten proposals, P1–P10, in `evidence/decision-table.md` | **P1–P7 accept, P9 revise, P8 + P10 reject** | Each proposal has a named verification in the decision table | Scope boundary; rejected the "delete item" button as anti-append-only, rejected one shared request ID, required items be created through the real form | Active/inactive item state deferred |
+| 09-22 14:43 | Claude Code | P3 vendor the scanner | Downloaded `html5-qrcode@2.3.8` into `docker/app/static/` and served it from the app instead of unpkg | Accept | `/static/html5-qrcode.min.js` → HTTP 200, 375,364 bytes; scan page references no CDN | Removing a third-party runtime dependency | Full offline reload not yet exercised |
+| 09-22 14:43 | Claude Code | P1 restore Week 3 behaviour | Re-added `get_overdue_min()` (reads `/config/overdue.env` per request), `NOW_OVERRIDE`, per-order computed status, and the overdue count on `/` | Accept | `/` shows `3 orders overdue`, threshold 20, reference 2026-01-15 12:30; 3 overdue / 4 waiting / 3 picked_up | Week 3 regression must be real, not just "orders load" | — |
+| 09-22 14:43 | Claude Code | P4–P7 safety guards | QR-only scanning; camera starts only on a button press and stops on leave; saved-image file scan; reason required for waste/correction; negative guard extended to `counted`/`correction`; low-stock rule printed | Accept | Each guard was triggered deliberately; exact refusal messages recorded in `failure-recovery-log.md` | Making the app refuse an unexplained waste | Phone-side camera behaviour still to be tested |
+| 09-22 14:44 | Claude Code | Step 3 known-answer run | Created both fixture items through `/inventory/new`, then r-01/r-02/r-03 | Accept | Hand calculation written **first**; app produced 8 bags, $2.25, $18.00, 3 rows — an exact match | Trusting the hand calculation over the app | — |
+| 09-22 14:45 | Claude Code | Step 7 failure battery | Ran unknown code, duplicate request, negative stock (two paths), missing waste reason, low-stock boundary, restart persistence | Accept | Every refusal preserved the previous state and added no row; boundary results 3=OK, 2=LOW, 1=LOW | Which item to use for destructive tests (scratch item, so the graded state stays at 8) | Camera-denied case pending on the phone |
+| 09-22 14:46 | Claude Code | Step 5 label check | Compared the label's QR bitmap with a freshly generated QR of the same code, plus a control against a different code | Accept | identical: **True**; control: **False**; caption shows the internal-use wording | Never fabricating a retail identifier | Character-by-character decode still to be done on the phone |
+| 09-22 14:47 | Claude Code | Documentation | Drafted `decision-table.md`, `acceptance-criteria.md`, `regression-test.md`, `quantity-cost-known-answer.md`, `failure-recovery-log.md`, `mobile-transfer-test.md`, `intern-workflow-handoff.md`, `team-agreement.md` | Accept with edits | Every number in the documents was cross-checked against terminal output | Final wording; teammate names and roles | Phone, teammate, and handoff-test rows are still blank by design |
+
+---
+
+| 09-22 19:20 | Claude Code | Phone test setup | Read the running tunnel's public URL from the local ngrok API and gave the exact phone address; confirmed `/`, `/health`, and `/inventory/scan` return 200 through it | Accept | Student opened the address on an iPhone and saw the app | Starting/stopping the tunnel; the token stayed student-only | Address changes on every ngrok restart |
+| 09-22 19:40 | Claude Code | Instructor feedback: "prefer tap over type" | Proposed P11–P14 (see `decision-table.md`): action buttons, quantity presets with −/+, staff-name buttons, quick reason chips, remembered name, keyboard kept as fallback | Accept, with P13 revised | Rebuilt and confirmed the buttons render, the known answer still computes, and `test_inventory.py` still passes | Keeping unit cost typed, because a receipt cost must come from the invoice, not a preset | A tap UI depends on JavaScript; the plain fields remain as the fallback |
+| 09-22 19:40 | Claude Code | Staff list without code edits | `/config/staff.txt` (same shared-config pattern as `overdue.env`) plus a PIN-gated Edit tab; seeded with Vinh Hoang, Yuhe, Shiming | Accept with a stated limitation | `/health` reports `staff_count: 3`; the three names render as buttons; a wrong PIN changes nothing | Naming the PIN honestly as an accident guard, not authentication | Anyone who reads `docker-compose.yml` can see the PIN; real access control is listed as a known limitation |
+| 09-22 19:45 | Claude Code | Demo state after practice entries | Student's practice receipts moved item 1 to 68 bags / $3.21. Agent proposed creating a clean demo item rather than deleting rows or resetting the database | Accept | `PHO65-INV-000104` shows 8 bags / $2.25 / $18.00 with 3 rows; item 1 keeps all five rows | Refusing to delete ledger history to make a number look right | Two Rice noodles entries now exist; the demo one is labelled "(demo)" |
+
+| 09-22 20:10 | Claude Code | "Make it look better; quantity like this photo" | Redesigned the interface (P15): numbered steps, round −/+ stepper with 1/5/10/100 presets modelled on the reference image, per-action help text, a live summary sentence, stat tiles, item cards, newest-first history | Accept | All nine routes return 200; item 4 still shows 8 / $2.25 / $18.00; Week 3 still 3 overdue; `test_inventory.py` still passes; checked at 375 px and on desktop | Judging whether a worker can understand the form at a glance | Visual only — no guard, field name, or calculation changed |
+
+## Command review (completed before approval)
+
+| Command / action | Target | Purpose | Risk | Recovery | Decision |
+|---|---|---|---|---|:-:|
+| `brew install ngrok` | Homebrew cask | Missing required tool | Installs software system-wide | `brew uninstall ngrok` | **Approve** |
+| `docker compose up -d --build` | `project-workspace/docker` | Build and start both services | Port 5000/2222 collision; containers left running | `docker compose down` | **Approve** |
+| `cp ~/.ssh/pho65_ed25519.pub docker/sshd/authorized_keys` | project file | Week 3 SSH regression | Copying the **private** key by mistake | Restore the empty file; re-copy the `.pub` | **Approve** — verified by fingerprint and a "no PRIVATE" grep |
+| `ssh-keygen -R "[localhost]:2222"` | `~/.ssh/known_hosts` | Clear the stale host key from the old image | Removing a legitimate warning | Entry re-added on next connect | **Approve** — only because we rebuilt the image ourselves |
+| `docker compose exec app python test_inventory.py` | app container | Packaged known-answer + guard test | None; uses a temporary DB | — | **Approve** |
+| `docker compose restart app` | app container | Persistence test | Brief downtime | Restart again | **Approve** |
+| `ngrok config add-authtoken <TOKEN>` | ngrok config | Phone tunnel | **Secret** — must never reach the agent | — | **Student-only. The agent must not propose, see, or run this command.** |
+| `docker compose down -v` | volumes | (never used) | Would delete the ledger | — | **Reject** — the `-v` form is forbidden in this project |
+
+## Stop-sign checklist
+
+1. Did any command print, copy, or transmit an ngrok token, private key, or password? **No.**
+2. Were project edits confined to `project-workspace`? **Yes** — plus expected changes outside it: Homebrew installed ngrok, and `~/.ssh/known_hosts` gained a new host-key entry.
+3. Was `sudo` used or approved? **No.**
+4. Was any database, volume, or history deleted? **No.**
