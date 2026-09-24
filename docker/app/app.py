@@ -84,6 +84,10 @@ def init_db():
           request_id TEXT NOT NULL UNIQUE
         );
         """)
+        # Archiving column, added without touching existing rows or history.
+        columns = [row["name"] for row in con.execute("PRAGMA table_info(items)")]
+        if "archived_at" not in columns:
+            con.execute("ALTER TABLE items ADD COLUMN archived_at TEXT")
 
 
 def money(cents):
@@ -146,14 +150,21 @@ def inventory_state(item_id):
             "value_cents": quantity * average_cents, "transactions": rows}
 
 
-def all_items():
+def all_items(archived=False):
+    clause = "archived_at IS NOT NULL" if archived else "archived_at IS NULL"
     with db() as con:
-        rows = con.execute("SELECT * FROM items ORDER BY name").fetchall()
+        rows = con.execute(f"SELECT * FROM items WHERE {clause} ORDER BY name").fetchall()
     result = []
     for row in rows:
         state = inventory_state(row["id"])
         result.append({**dict(row), **state, "low": state["quantity"] <= row["reorder_point"]})
     return result
+
+
+def ledger_row_count(item_id):
+    with db() as con:
+        return con.execute("SELECT COUNT(*) AS n FROM inventory_transactions WHERE item_id=?",
+                           (item_id,)).fetchone()["n"]
 
 
 def add_transaction(item_id, action, quantity_delta, unit_cost_cents, recorded_by, note, request_id):
@@ -267,6 +278,11 @@ th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mut
 .itemcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:.9rem 1rem;text-decoration:none;color:inherit;display:block}
 .itemcard:hover{border-color:var(--brand)}
 .itemcard .nm{font-weight:700;font-size:1.05rem}
+.itemwrap{position:relative}
+.removebtn{position:absolute;top:.55rem;right:.55rem;background:#fff;color:var(--warn);border:1.5px solid var(--line);border-radius:999px;padding:.3rem .75rem;font:inherit;font-size:.85rem;min-height:34px;cursor:pointer;opacity:0;transition:opacity .12s}
+.itemwrap:hover .removebtn,.itemwrap:focus-within .removebtn{opacity:1}
+.removebtn:hover{border-color:var(--warn);background:var(--warn-soft)}
+@media(hover:none){.removebtn{opacity:1}}
 .step{display:flex;align-items:center;gap:.6rem;margin:1.4rem 0 .5rem;font-weight:700}
 .step .n{background:var(--brand);color:#fff;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.9rem;flex:none}
 .taprow{display:flex;flex-wrap:wrap;gap:.5rem;margin:.4rem 0}
@@ -302,7 +318,8 @@ def page(body, **context):
 def inventory():
     return page("""<h1>Items</h1><p class=hint>Every number is replayed from the ledger. Tap an item to record what happened to it.</p>
     <div class=grid>
-    {% for i in items %}<a class=itemcard href='/inventory/item/{{i.id}}'>
+    {% for i in items %}<div class=itemwrap>
+      <a class=itemcard href='/inventory/item/{{i.id}}'>
       <div class=nm>{{i.name}}</div>
       <div class=hint><span class=code>{{i.scan_code}}</span></div>
       <div class=stats style='margin:.6rem 0 .4rem'>
@@ -311,13 +328,53 @@ def inventory():
       </div>
       <span class='pill {{ "low" if i.low else "ok" }}'>{{ "LOW — review" if i.low else "OK" }}</span>
       <span class=hint>low at {{i.reorder_point}}</span>
-    </a>{% endfor %}
+      </a>
+      <form method=post action='/inventory/item/{{i.id}}/remove' onsubmit="return confirm('Remove {{i.name}} from the list?\\n\\nIf it has recorded history it is archived, not deleted — the ledger is kept and you can restore it.');">
+        <button class=removebtn type=submit title='Remove from the list'>Remove</button></form>
+    </div>{% endfor %}
     </div>
     {% if not items %}<div class=card><p>No items yet. <a href='/inventory/new'>Create the first internal item</a>.</p></div>{% endif %}
+    {% if archived %}<details class=card><summary><strong>Removed items ({{archived|length}})</strong> — history kept</summary>
+      <table><tr><th>Item</th><th>Code</th><th>Ledger rows</th><th></th></tr>
+      {% for a in archived %}<tr><td><a href='/inventory/item/{{a.id}}'>{{a.name}}</a></td><td class=code>{{a.scan_code}}</td><td>{{a.transactions|length}}</td>
+      <td><form method=post action='/inventory/item/{{a.id}}/restore'><button class=ghost>Restore</button></form></td></tr>{% endfor %}</table>
+      <p class=hint>Items with recorded history are archived rather than deleted, so the ledger stays complete and auditable.</p></details>{% endif %}
+
     <div class=card><h2>How the numbers work</h2>
     <p class=hint>An item is <strong>LOW</strong> when its quantity is at or below its low-stock point (quantity &lt;= reorder point).</p>
     <p class=hint>Reference costing: receive 10 at $2.00, receive 10 at $2.50, then use 12 → 8 left, $2.25 average, $18.00 value.</p></div>""",
-    items=all_items(), money=money)
+    items=all_items(), archived=all_items(archived=True), money=money)
+
+
+@app.post("/inventory/item/<int:item_id>/remove")
+def remove_item(item_id):
+    """Remove an item from the list.
+
+    An item that has never been used is deleted outright. An item with ledger
+    history is archived instead: deleting it would orphan its transactions and
+    break the append-only rule the whole design rests on.
+    """
+    with db() as con:
+        item = con.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        abort(404)
+    rows = ledger_row_count(item_id)
+    with db() as con:
+        if rows == 0:
+            con.execute("DELETE FROM items WHERE id=?", (item_id,))
+            flash(f"Deleted {item['name']}. It had no recorded history, so nothing was lost.")
+        else:
+            con.execute("UPDATE items SET archived_at=? WHERE id=?", (utc_now(), item_id))
+            flash(f"Archived {item['name']}. Its {rows} ledger rows are kept — open 'Removed items' to restore it.")
+    return redirect(url_for("inventory"))
+
+
+@app.post("/inventory/item/<int:item_id>/restore")
+def restore_item(item_id):
+    with db() as con:
+        con.execute("UPDATE items SET archived_at=NULL WHERE id=?", (item_id,))
+    flash("Item restored to the list.")
+    return redirect(url_for("inventory"))
 
 
 @app.route("/inventory/lookup")

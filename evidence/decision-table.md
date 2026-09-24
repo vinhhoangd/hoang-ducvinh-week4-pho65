@@ -28,7 +28,11 @@ Scope limits given to the agent: extend the existing Flask/Docker app only; no a
 
 | P15 | Interface redesign for first-time users: numbered steps, a round −/+ stepper with 1 / 5 / 10 / 100 presets, one-line help under each action, a live plain-language summary before the submit button, stat tiles for on-hand / average / value, item cards on the list page, newest-first history | `docker/app/app.py` (templates and CSS only) | Feedback that the form was confusing for a new user. A worker should be able to read what they are about to record before pressing anything | Visual changes could hide a rule or change what gets submitted | All field names and guards unchanged; re-ran the full desktop pass, the known answer, and `test_inventory.py` after the redesign | **Accept** — presentation only, no change to validation, costing, or the ledger |
 
-Bounded plan approved: **P1–P7, P11, P12, P14, P15** proceed; **P8, P10** rejected; **P9, P13** revised. No other file is changed. `docker-compose.yml`, the Dockerfiles, `sshd/`, and the CSV fixtures stay as shipped (except `sshd/authorized_keys`, which receives team public keys).
+| P16 | Hover-reveal **Remove** button on every item card, requested after P8 was rejected | `docker/app/app.py`, `items.archived_at` column | The team needs a way to clear mistyped or discontinued items from the working list | A plain delete would orphan that item's transactions and destroy the explanation of how a count was reached — the exact thing the append-only rule protects | Remove an item with no history (deleted), one with history (archived), then restore it and confirm its rows are intact | **Accept as a revision of P8, not a reversal of the rule:** the server decides. Zero ledger rows → deleted outright. Any history → archived (hidden, restorable, rows untouched), listed under "Removed items" |
+
+Bounded plan approved: **P1–P7, P11, P12, P14, P15, P16** proceed; **P10** rejected; **P8, P9, P13** revised.
+
+> Note on P8 → P16: P8 was rejected as first proposed (a delete button that would remove an item and orphan its ledger rows). P16 grants the same interface affordance without weakening the guarantee. Tested 2026-09-23: Viet BBQ (7 rows) and Limes (5 rows) were archived rather than deleted, and Limes restored with all 5 rows present. No other file is changed. `docker-compose.yml`, the Dockerfiles, `sshd/`, and the CSV fixtures stay as shipped (except `sshd/authorized_keys`, which receives team public keys).
 
 ### Data model review (Step 2.3)
 

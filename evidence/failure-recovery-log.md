@@ -127,6 +127,19 @@ Character-by-character comparison of the decoded string against the stored code 
 
 ---
 
+### Extra: removing an item never destroys its history
+
+- **Prediction:** an item that has recorded events cannot be deleted; an item with no events can be, because there is nothing to lose.
+- **Trigger (2026-09-23):** pressed Remove on Viet BBQ (7 ledger rows) and on Limes (5 ledger rows).
+- **Observed:**
+  ```text
+  Archived Viet BBQ. Its 7 ledger rows are kept — open 'Removed items' to restore it.
+  Archived Limes. Its 5 ledger rows are kept — open 'Removed items' to restore it.
+  ```
+  Both disappeared from the working list and appeared under "Removed items". Opening the archived Limes still showed all 5 rows (`received`, `wasted`, `correction`, two `counted`).
+- **Recovery:** pressed Restore; Limes returned to the list with its history unchanged.
+- **Why it matters:** deleting the item would have orphaned its transactions, and the ledger could no longer explain how the count was reached. See `decision-table.md` P8 → P16. **PASS**
+
 ## Summary
 
 | Condition | Status | Evidence |
