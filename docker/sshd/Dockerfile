@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Minimal Linux + OpenSSH server container for the Pho65 "remote ops" scenario.
 # Purpose-built for teaching: real SSH connection, real key-based auth, real
