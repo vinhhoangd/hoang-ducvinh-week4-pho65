@@ -114,7 +114,6 @@ Using stock removes units that were already bought at the blended cost. Twelve b
 
 ## Non-Technical Manager Summary
 
-*(≈190 words)*
 
 Pho65 staff currently change a number in a spreadsheet, so nobody can tell why stock moved or whether a tap was counted twice. We extended the café's existing system with a phone-friendly inventory helper. A worker identifies an ingredient in one of three ways — camera scan, a saved photo of the label, or typing the code — and the app shows the matched item before anything is recorded. The worker then records a delivery, a use, a waste, or a correction, and each one becomes a permanent line in a ledger showing who recorded it and when.
 

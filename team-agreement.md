@@ -7,8 +7,8 @@
 | Member | Machine | Preferred contact | First responsibility |
 |---|---|---|---|
 | Vinh Hoang | MacBook (build host) | Canvas Inbox / team chat | **Builder** — ledger, Week 3 restore, scan paths |
-| **TBD — teammate B** | MacBook | team chat | **Verifier** — independent re-run of the known-answer and failure tests |
-| **TBD — teammate C** | Ubuntu | team chat | **Business reviewer** — costing trade-off, intern handoff test |
+| Yuhe | MacBook | team chat | **Verifier** — independent re-run of the known-answer and failure tests |
+| Shiming | Ubuntu | team chat | **Business reviewer** — costing trade-off, intern handoff test |
 
 Responsibilities rotate at the next checkpoint: Vinh → Verifier, B → Business reviewer, C → Builder. Every member speaks during the final demonstration.
 
