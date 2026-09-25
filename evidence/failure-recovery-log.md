@@ -140,6 +140,28 @@ Character-by-character comparison of the decoded string against the stored code 
 - **Recovery:** pressed Restore; Limes returned to the list with its history unchanged.
 - **Why it matters:** deleting the item would have orphaned its transactions, and the ledger could no longer explain how the count was reached. See `decision-table.md` P8 → P16. **PASS**
 
+### Extra: adversarial input audit (2026-09-24)
+
+Step 3.1 requires the app to "reject missing items, invalid event types, invalid quantities, and invalid costs with a plain-language message". We tested that claim instead of assuming it, by submitting 16 deliberately malformed events. **Five real defects were found and fixed.**
+
+| # | Probe | Before the fix | After the fix |
+|:-:|---|---|---|
+| 1 | Event for item `9999`, which does not exist | **Orphan row written.** SQLite leaves foreign keys OFF, so the INSERT succeeded and the user then saw a 404 — a ledger row belonging to no item | "That item is not in Pho65 inventory, so nothing was recorded." Item existence is checked before the write, and `PRAGMA foreign_keys = ON` is now set on every connection |
+| 2 | Quantity `abc`, or empty | **HTTP 500 crash page** | `"abc" is not a whole number of units. Use the −/+ buttons or type a number like 5.` |
+| 3 | Item id `abc` | **HTTP 500 crash page** | Plain message, returns to the Items list |
+| 4 | Quantity `0` on a USE | **Accepted** — a no-op row entered the ledger | "Zero changes nothing, so there is nothing to record." |
+| 5 | Action `teleported` | Raw SQL leaked to the user: `CHECK constraint failed: action IN (...)` | "That is not a kind of event this pilot records. Choose Received, Used, Wasted, Counted, or Correction." |
+| 6 | Cost `two dollars` on a receipt | Misleading message (it reported negative stock) | `"two dollars" is not an amount of money. Copy the unit price from the invoice, like 2.50.` |
+| 7 | Cost typed on a USE | Silently stored a purchase price against stock leaving the shelf | Cost is ignored and the worker is told so |
+
+Already correct before the audit, and re-confirmed after: negative cost on a receipt, receipt with no cost, missing request ID, waste/correction without a reason, negative stock by use, negative stock by correction, duplicate request ID.
+
+**A sixth defect, found by accident:** `/inventory/new` returned HTTP 500 for every visitor. `code_for_new_item()` reads the highest `PHO65-INV-%` code and calls `int()` on its last segment, and a hand-typed item code `PHO65-INV-000RICE` made that crash. Two fixes: the suggester now ignores malformed codes, and new codes must match `PHO65-INV-` + exactly six digits, which is the format the assignment specifies. The existing malformed item was renumbered to `PHO65-INV-000107`; its three ledger rows were untouched, because transactions reference the item's id, not its code.
+
+**Data repair.** The orphan row created by probe 1 was deleted — it referenced no item, so it was corrupt data rather than café history, and leaving it would have contradicted every count. The probe rows on item 1 (a practice item, not the graded known-answer item) were left in place: they are real recorded events, and removing them would break the append-only rule.
+
+**Verified after all fixes:** every probe now rejected with a readable message and no ledger row; 0 orphan rows; 0 malformed codes; demo item still 8 units / $2.25 / $18.00; Week 3 still 3 overdue; `test_inventory.py` passes; SSH `whoami` → `pho65user`; label renders.
+
 ## Summary
 
 | Condition | Status | Evidence |

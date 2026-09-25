@@ -6,6 +6,7 @@ overdue calculation is kept intact on "/" as a regression check.
 import csv
 import io
 import os
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -53,10 +54,19 @@ ACTION_HELP = {
 }
 
 
+VALID_ACTIONS = {"starting", "received", "used", "wasted", "counted", "correction"}
+# Internal code format required by the assignment: prefix + six digits.
+INTERNAL_CODE_PATTERN = re.compile(r"^PHO65-INV-\d{6}$")
+
+
 def db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
+    # SQLite leaves foreign keys OFF unless asked. Without this, a transaction
+    # can be written against an item id that does not exist, leaving an orphan
+    # row that no ledger can explain.
+    connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
@@ -170,6 +180,14 @@ def ledger_row_count(item_id):
 def add_transaction(item_id, action, quantity_delta, unit_cost_cents, recorded_by, note, request_id):
     if not request_id:
         raise ValueError("Missing request ID. Refresh and try again.")
+    if action not in VALID_ACTIONS:
+        raise ValueError("That is not a kind of event this pilot records. Choose Received, Used, Wasted, Counted, or Correction.")
+    with db() as con:
+        item = con.execute("SELECT id FROM items WHERE id=?", (item_id,)).fetchone()
+    if item is None:
+        raise ValueError("That item is not in Pho65 inventory, so nothing was recorded. Look the item up again.")
+    if quantity_delta == 0:
+        raise ValueError("Enter how many units this event covers. Zero changes nothing, so there is nothing to record.")
     state = inventory_state(item_id)
     # Every reducing event is guarded, not only used/wasted: a signed counted or
     # correction event must not drive stock below zero either.
@@ -192,10 +210,16 @@ def add_transaction(item_id, action, quantity_delta, unit_cost_cents, recorded_b
 
 
 def code_for_new_item():
+    """Suggest the next internal code.
+
+    Only well-formed codes can be counted: one malformed row (a hand-typed code
+    such as PHO65-INV-000RICE) must not be able to break this page.
+    """
     with db() as con:
-        last = con.execute("SELECT scan_code FROM items WHERE scan_code LIKE 'PHO65-INV-%' ORDER BY scan_code DESC LIMIT 1").fetchone()
-    number = int(last["scan_code"].rsplit("-", 1)[1]) + 1 if last else 101
-    return f"PHO65-INV-{number:06d}"
+        codes = [row["scan_code"] for row in
+                 con.execute("SELECT scan_code FROM items WHERE scan_code LIKE 'PHO65-INV-%'")]
+    numbers = [int(code.rsplit("-", 1)[1]) for code in codes if INTERNAL_CODE_PATTERN.match(code)]
+    return f"PHO65-INV-{(max(numbers) + 1) if numbers else 101:06d}"
 
 
 # --- Week 3 order tracker ---------------------------------------------------
@@ -475,8 +499,10 @@ def new_item():
         unit = request.form.get("base_unit", "each").strip().lower()
         try: point = int(request.form.get("reorder_point", "0"))
         except ValueError: point = -1
-        if not name or not code.startswith("PHO65-INV-") or point < 0 or not unit:
-            flash("Use a name, non-negative low-stock point, a unit, and a PHO65-INV internal code.")
+        if not INTERNAL_CODE_PATTERN.match(code):
+            flash("An internal code must read PHO65-INV- followed by exactly six digits, for example PHO65-INV-000101.")
+        elif not name or point < 0 or not unit:
+            flash("Use a name, a base unit, and a low-stock point of zero or more.")
         else:
             try:
                 with db() as con: con.execute("INSERT INTO items (name,scan_code,code_kind,base_unit,reorder_point,created_at) VALUES (?,?,?,?,?,?)", (name, code, "internal", unit, point, utc_now()))
@@ -672,17 +698,54 @@ def item_detail(item_id):
 
 @app.post("/inventory/transaction")
 def transaction():
-    item_id, action = int(request.form["item_id"]), request.form["action"]
-    raw_quantity = int(request.form["quantity"])
-    quantity = -abs(raw_quantity) if action in {"used", "wasted"} else raw_quantity
-    raw_cost = request.form.get("unit_cost", "").strip()
-    try: cost = int((Decimal(raw_cost) * 100).quantize(Decimal("1"), ROUND_HALF_UP)) if raw_cost else None
-    except Exception: cost = -1
+    """Parse and validate the form, then hand one clean event to the ledger.
+
+    Every bad input is answered with a plain-language message; nothing here may
+    raise a 500 page at a worker mid-shift.
+    """
     try:
-        add_transaction(item_id, action, quantity, cost, request.form.get("recorded_by", "").strip(), request.form.get("note", "").strip(), request.form.get("request_id", ""))
+        item_id = int(request.form.get("item_id", ""))
+    except ValueError:
+        flash("Something went wrong identifying that item. Look it up again from the Items list.")
+        return redirect(url_for("inventory"))
+
+    action = request.form.get("action", "").strip()
+    raw_quantity = request.form.get("quantity", "").strip()
+    try:
+        quantity = int(raw_quantity)
+    except ValueError:
+        flash(f'"{raw_quantity}" is not a whole number of units. Use the −/+ buttons or type a number like 5.'
+              if raw_quantity else "Enter how many units this event covers.")
+        return redirect(url_for("item_detail", item_id=item_id))
+    if action in {"used", "wasted"}:
+        quantity = -abs(quantity)
+
+    raw_cost = request.form.get("unit_cost", "").strip()
+    cost = None
+    if action in {"received", "starting"}:
+        if raw_cost:
+            try:
+                cost = int((Decimal(raw_cost) * 100).quantize(Decimal("1"), ROUND_HALF_UP))
+            except Exception:
+                flash(f'"{raw_cost}" is not an amount of money. Copy the unit price from the invoice, like 2.50.')
+                return redirect(url_for("item_detail", item_id=item_id))
+    elif raw_cost:
+        # A cost only belongs to a receipt. Ignore it rather than storing a
+        # price against stock leaving the shelf.
+        flash("Only a receipt carries a purchase cost, so the cost box was ignored for this event.")
+
+    try:
+        add_transaction(item_id, action, quantity, cost, request.form.get("recorded_by", "").strip(),
+                        request.form.get("note", "").strip(), request.form.get("request_id", ""))
         flash("Recorded once. Check the numbers below.")
-    except (ValueError, sqlite3.Error) as error: flash(str(error))
-    return redirect(url_for("item_detail", item_id=item_id))
+    except ValueError as error:
+        flash(str(error))
+    except sqlite3.Error:
+        flash("That event could not be recorded, so nothing was saved. Check the item and try again.")
+
+    with db() as con:
+        still_there = con.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone()
+    return redirect(url_for("item_detail", item_id=item_id) if still_there else url_for("inventory"))
 
 
 @app.route("/inventory/label/<int:item_id>")
