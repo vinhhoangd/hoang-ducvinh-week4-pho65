@@ -11,8 +11,8 @@ Everything here is a **development pilot** on fictional data. It is not a produc
 | Member | Machine | Role this checkpoint | Rotates to |
 |---|---|---|---|
 | Vinh Hoang | MacBook (build host) | Builder — ledger, Week 3 restore, scan paths | Verifier |
-| **TBD — teammate B** | MacBook | Verifier — independent re-runs | Business reviewer |
-| **TBD — teammate C** | Ubuntu | Business reviewer — costing decision, handoff test | Builder |
+| Yuhe | MacBook | Verifier — independent re-runs | Business reviewer |
+|Shiming | Ubuntu | Business reviewer — costing decision, handoff test | Builder |
 
 Roles, the safe-stop rule, and handoff times are in [team-agreement.md](team-agreement.md); individual work is listed in [team-contributions.md](team-contributions.md).
 

@@ -27,18 +27,18 @@ The phone reaches the local app through a **temporary** ngrok HTTPS tunnel. The 
 
 | # | Check | Expected | Observed | PASS/FAIL |
 |:-:|---|---|---|:-:|
-| 1 | App page loaded over HTTPS | Padlock shown; page renders | | |
-| 2 | Layout readable without horizontal scrolling | No sideways scroll at phone width | | |
-| 3 | Buttons usable by touch | Targets at least ~44 px tall; no mis-taps | | |
-| 4 | Camera prompt appeared only after a user action | Nothing happens until "Start camera" is pressed | | |
-| 5 | Camera decoded the internal QR | Opens Rice noodles (`PHO65-INV-000101`) | | |
+| 1 | App page loaded over HTTPS | Padlock shown; page renders | |Pass |
+| 2 | Layout readable without horizontal scrolling | No sideways scroll at phone width | |Pass |
+| 3 | Buttons usable by touch | Targets at least ~44 px tall; no mis-taps | |Pass |
+| 4 | Camera prompt appeared only after a user action | Nothing happens until "Start camera" is pressed | |Pass |
+| 5 | Camera decoded the internal QR | Opens Rice noodles (`PHO65-INV-000101`) | |Pass |
 | 6 | Saved-image path decoded the same QR | Same item from `evidence/label-images/PHO65-INV-000101.png` | | |
 | 7 | Manual path matched the same item | Typing the code opens the same item | | |
 | 8 | Decoded string matches stored code character by character | `PHO65-INV-000101` exactly | | |
 | 9 | One confirmed transaction created exactly one ledger row | Row count +1, quantity changes once | | |
-| 10 | Desktop view showed the same result | Same quantity/average/value on the Mac | | |
+| 10 | Desktop view showed the same result | Same quantity/average/value on the Mac | |Pass |
 | 11 | Camera denied → fallback works (Failure E) | Explanation shown; image/manual still work | | |
-| 12 | Retail barcode does not scan | Nothing decodes (QR only) | | |
+| 12 | Retail barcode does not scan | Nothing decodes (QR only) | |Pass |
 
 ## Observations
 

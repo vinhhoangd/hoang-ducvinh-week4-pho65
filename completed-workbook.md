@@ -22,10 +22,10 @@ format:
 ## Team Roles & Rotation
 
 - **Builder Lead:** Vinh Hoang — Docker build, SQLite ledger, Week 3 restore, the three identification paths.
-- **Verifier Lead:** **TBD — teammate B** (MacBook) — independent re-run of the known-answer sequence and the phone transfer test.
-- **Business & Decision Lead:** **TBD — teammate C** (Ubuntu) — costing trade-off, intern handoff test, README limitations.
+- **Verifier Lead:** Yuhe (MacBook) — independent re-run of the known-answer sequence and the phone transfer test.
+- **Business & Decision Lead:** SHiming (Ubuntu) — costing trade-off, intern handoff test, README limitations.
 
-Rotation agreed for the next checkpoint: Vinh → Verifier, B → Business, C → Builder (`team-agreement.md`).
+Rotation agreed for the next checkpoint: Vinh → Verifier, Yuhe → Business, Shiming → Builder (`team-agreement.md`).
 
 ---
 
