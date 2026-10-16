@@ -557,9 +557,7 @@ def staff_admin():
     <form method=post><label>Name <input name=add_name placeholder='New teammate' required></label>
     <label>PIN <input name=pin inputmode=numeric autocomplete=off required style='max-width:150px'></label>
     <button class=primary>Add to staff list</button></form></div>
-    <div class=card><h2>About the PIN</h2>
-    <p class=hint>The PIN only prevents accidental edits during a shift. <strong>It is not a login and not a secret</strong> — it is set in <span class=code>docker-compose.yml</span>, so anyone who can read the project can see it. Never put a real password here. Proper staff accounts are listed as a known limitation in the README.</p>
-    <p class=hint>The list is stored at <span class=code>/config/staff.txt</span>, so it can also be edited over SSH, exactly like the Week 3 threshold file.</p></div>""",
+    """,
     names=names)
 
 

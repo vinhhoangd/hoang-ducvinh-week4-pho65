@@ -12,6 +12,11 @@
 # replaces its shared-config/overdue.env. This file itself must never be
 # seeded; it stays the clean reference build.
 
+# Pinned project name. Without this, Compose names the project after the folder
+# ("docker"), which every course week shares -- so another week's `up` can
+# silently recreate or replace this week's containers and images.
+name: pho65-w4
+
 services:
   app:
     build: ./app
